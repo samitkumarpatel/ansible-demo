@@ -1,0 +1,8 @@
+**/.venv
+.venv
+*.retry
+*.DS_Store
+.terraform
+*.tfstate
+**/env.sh
+*.backup

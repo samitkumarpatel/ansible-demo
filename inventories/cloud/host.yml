@@ -1,0 +1,17 @@
+---
+localhost:
+  hosts:
+    localhost:
+      ansible_connection: local
+  vars:
+    ansible_python_interpreter: python
+azure:
+  hosts:
+    51.145.199.4:
+      ansible_connection: ssh
+      ansible_user: lab_admin
+      ansible_password: lab_admin123
+    52.157.86.160:
+      ansible_connection: ssh
+      ansible_user: testadmin
+      ansible_password: Password1234!

@@ -1,0 +1,105 @@
+- hosts: localhost
+  gather_facts: false
+  vars:
+    resource_group_name: "jenkins01"
+    location: "westeurope"
+    vnet_name: "vnet001"
+    subnet_name: "snet001"
+    ngs_name: "nsg001"
+    network_interface_name: "nic001"
+    public_ip_name: "pip001"
+    storage_name: "skpstorage001"
+    tags:
+      Environment: Development
+      Automation: Ansible
+  tasks:    
+    - name: Resource Group
+      azure_rm_resourcegroup:
+        name: "{{ resource_group_name }}"
+        location: "{{ location }}"
+        tags: "{{ tags }}"
+    
+    - name: Storage Account
+      azure_rm_storageaccount:
+        resource_group: "{{ resource_group_name }}"
+        name: "{{ storage_name }}"
+        account_type: Standard_LRS
+    
+    - name: virtual network
+      azure_rm_virtualnetwork:
+        resource_group: "{{ resource_group_name }}"
+        name: "{{ vnet_name }}"
+        address_prefixes: "10.10.0.0/16"
+
+    - name: subnet
+      azure_rm_subnet:
+        resource_group: "{{ resource_group_name }}"
+        name: "{{ subnet_name }}"
+        address_prefix: "10.10.0.0/24"
+        virtual_network: "{{ vnet_name }}"
+
+    - name: public ip
+      azure_rm_publicipaddress:
+        resource_group: "{{ resource_group_name }}"
+        allocation_method: Static
+        name: "{{ public_ip_name }}"
+
+    - name: network security group that allows SSH
+      azure_rm_securitygroup:
+        resource_group: "{{ resource_group_name }}"
+        name: "{{ ngs_name }}"
+        rules:
+          - name: SSH
+            protocol: Tcp
+            destination_port_range: 22
+            access: Allow
+            priority: 101
+            direction: Inbound
+          - name: HTTP_80
+            protocol: "*"
+            destination_port_range: 80
+            access: Allow
+            priority: 102
+            direction: Inbound
+          - name: HTTP_8080
+            protocol: "*"
+            destination_port_range: 8080
+            access: Allow
+            priority: 103
+            direction: Inbound
+    
+    - name: network interface
+      azure_rm_networkinterface:
+        resource_group: "{{ resource_group_name }}"
+        name: "{{ network_interface_name }}"
+        virtual_network: vnet001
+        subnet: "{{ subnet_name }}"
+        public_ip_name: "{{ public_ip_name }}"
+        security_group: "{{ ngs_name }}"
+
+    - name: virtual machine
+      azure_rm_virtualmachine:
+        resource_group: "{{ resource_group_name }}"
+        name: vm001
+        vm_size: Standard_D2s_v3
+        storage_account: "{{ storage_name }}"
+        storage_container: vm001
+        storage_blob: vm001.vhd
+        admin_username: lab_admin
+        admin_password: lab_admin123
+        network_interfaces: "{{ network_interface_name }}"
+        image:
+          offer: UbuntuServer
+          publisher: Canonical
+          sku: 16.04-LTS
+          version: latest
+    
+    - name: clean Up
+      block:
+        - name: Delete the resource group
+          azure_rm_resourcegroup:
+            name: "{{ resource_group_name }}"
+            state: absent
+      tags: 
+        - never
+        - clean

@@ -1,0 +1,122 @@
+---
+- hosts: vm03
+  become: true
+  environment:
+      LC_ALL: C
+  tasks:
+    - name: Ubuntu
+      block:
+      - name: Add local specific env variable on /etc/environment
+        lineinfile:
+          path: /etc/environment
+          line: LC_ALL=C
+          create: yes
+      - name: apt update
+        apt:
+          upgrade: dist
+      - name: Install required system apt packages
+        apt: 
+          name: "{{ item }}"
+          state: latest
+          update_cache: yes
+        loop: 
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - python-pip
+          - virtualenv
+          - python3-setuptools
+          - docker-compose
+      - name: Add Docker GPG apt Key
+        apt_key:
+          url: https://download.docker.com/linux/ubuntu/gpg
+          state: present
+      - name: Add Docker Repository
+        apt_repository:
+          repo: deb https://download.docker.com/linux/ubuntu bionic stable
+          state: present
+      - name: Update apt and install docker-ce
+        apt:         
+          name: docker-ce
+          update_cache: yes
+          state: latest
+      - name: Install Docker Module for Python
+        pip:
+          name: "{{ item }}"
+          executable: pip
+        loop:
+        - docker
+      when: ansible_os_family == 'Debian'
+    
+    - name: RedHat
+      block:
+        - name: Add local specific env variable on /etc/environment
+          lineinfile:
+            path: /etc/environment
+            line: "{{ item }}"
+            create: yes
+          with_items:
+          - LANG=en_US.utf-8
+          - LC_ALL=en_US.utf-8
+        - name: Install Required yum package
+          yum:
+            name: "{{ packages }}"
+            state: latest
+          vars:
+            packages:
+            - epel-release
+            - yum-utils
+            - device-mapper-persistent-data
+            - lvm2
+            - curl
+            - wget
+            - unzip
+            - python-pip
+            - docker-compose
+        - name: Add Docker repo
+          get_url:
+            url: https://download.docker.com/linux/centos/docker-ce.repo
+            dest: /etc/yum.repos.d/docer-ce.repo
+        - name: Enable Docker Edge repo
+          ini_file:
+            dest: /etc/yum.repos.d/docer-ce.repo
+            section: 'docker-ce-edge'
+            option: enabled
+            value: "0"
+        - name: Enable Docker Test repo
+          ini_file:
+            dest: /etc/yum.repos.d/docer-ce.repo
+            section: 'docker-ce-test'
+            option: enabled
+            value: "0"
+        - name: Install Docker
+          package:
+            name: docker-ce
+            state: latest
+        - name: Install Docker Module for Python
+          pip:
+            name: "{{ item }}"
+            executable: pip
+          loop:
+          - docker
+          - virtualenv          
+      when: ansible_os_family == 'RedHat'
+
+    - name: 'add users to docker group'
+      user:
+        name: "{{ ansible_user }}"
+        groups: "docker"
+        append: yes
+    - name: restart docker service
+      service:
+        name: docker
+        state: restarted
+    - name: Init a new swarm with default parameters
+      docker_swarm:
+        advertise_addr: "{{ ansible_default_ipv4.address }}"
+        state: present
+      register: swarm
+    - debug:
+        msg: "{{ swarm }}"

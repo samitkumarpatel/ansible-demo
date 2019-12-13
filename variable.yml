@@ -1,0 +1,22 @@
+---
+defined_groups:
+  - name: name01
+    deploy_tag: 
+      - A
+    version: 01
+    other: Blank
+  - name: name02
+    deploy_tag: 
+      - A
+    version: 01
+    other: Blank
+  - name: name03
+    deploy_tag: 
+      - B
+    version: 02
+    other: Blank
+  - name: name04
+    deploy_tag: 
+      - C
+    version: 03
+    other: Blank

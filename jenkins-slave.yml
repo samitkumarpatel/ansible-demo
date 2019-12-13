@@ -1,0 +1,4 @@
+- hosts: all
+  vars:
+  tasks:
+  become: False
