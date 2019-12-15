@@ -75,6 +75,7 @@
             - unzip
             - python-pip
             - docker-compose
+            - net-tools
         - name: Add Docker repo
           get_url:
             url: https://download.docker.com/linux/centos/docker-ce.repo
