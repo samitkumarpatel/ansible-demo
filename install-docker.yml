@@ -45,7 +45,7 @@
       - name: Install Docker Module for Python
         pip:
           name: "{{ item }}"
-          executable: pip
+          executable: pip3
         loop:
         - docker
       when: ansible_os_family == 'Debian'
@@ -99,7 +99,7 @@
         - name: Install Docker Module for Python
           pip:
             name: "{{ item }}"
-            executable: pip
+            executable: pip3
           loop:
           - docker
           - virtualenv          
