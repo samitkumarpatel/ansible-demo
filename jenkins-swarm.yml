@@ -1,0 +1,164 @@
+---
+# This playbook will spin customised Jenkins docker container in docker swarm as Jenkins master
+- hosts: jenkins
+  become: True
+  vars:
+    base_folder: "/usr/jenkins"
+    jenkins_installation_folder: "{{ base_folder }}/.project01"
+    jenkins_home_path: "{{ jenkins_installation_folder }}/jenkins_home"
+    jenkins_compose_path: "{{ jenkins_installation_folder }}/compose"
+    jenkins_tools_path: "{{ jenkins_home_path }}/tools"
+    jenkins_tools_download_path: "{{ jenkins_home_path }}/tools/download"
+    jenkins_executor_path: "{{ jenkins_home_path }}/executor0"
+    jenkins_jcac_config_path: "{{ jenkins_installation_folder }}/jcac"
+    jenkins_slave00_path: "{{ jenkins_installation_folder }}/slave00"    
+    init_folders:
+      - "{{ jenkins_installation_folder }}"
+      - "{{ jenkins_home_path }}"
+      - "{{ jenkins_compose_path }}"
+      - "{{ jenkins_tools_path }}"
+      - "{{ jenkins_tools_download_path }}"
+      - "{{ jenkins_executor_path }}"
+      - "{{ jenkins_jcac_config_path }}"     
+    docker_registry:
+      - { url: "https://docker.registry.net", username: "{{ vault_username }}", password: "{{ vault_password }}" }
+    image: docker.registry.net/jenkins-blueocean:2.19.0-12-04-2019
+    jenkins_exposed_port: 8080
+
+  tasks:    
+    
+    - block:        
+      - name: Jenkins Folder Structure Creation
+        file:
+          path: "{{ item }}"
+          state: directory
+          mode: '0755'
+        with_items: "{{ init_folders }}"
+      
+    - block:
+      - name: Login to docker registry
+        docker_login:
+          registry: "{{ item.url }}"
+          username: "{{ item.username }}"
+          password: "{{ item.password }}"          
+          reauthorize: yes
+        with_items: "{{ docker_registry }}"
+        no_log: True
+        become_user: root
+      - name: Generate Jenkins Code As Config file
+        template:
+          src: "{{ playbook_dir }}/jcac.yml.j2"
+          dest: "{{ jenkins_jcac_config_path }}/jcac.yml"
+          newline_sequence: '\r\n'
+      tags:
+        - config
+    
+    - block:
+        - name: 
+          docker_swarm:
+            advertise_addr: "{{ ansible_default_ipv4.address }}"
+            state: present
+          register: swarm
+        - debug:
+            msg: "{{ swarm.swarm_facts.JoinTokens }}"
+          when: swarm.swarm_facts is defined
+        - name: Pull the docker image
+          docker_image:
+            name: "{{ image }}"
+            source: pull
+        - name: docker server remove - jenkins
+          docker_swarm_service:
+            name: jenkins
+            state: absent
+        - name: docker server create - jenkins
+          docker_swarm_service:
+            name: jenkins
+            image: "{{ image }}"
+            publish:
+            - published_port: "{{ jenkins_exposed_port }}"
+              target_port: 8080
+            - published_port: 50000
+              target_port: 50000
+            replicas: 1
+            user: root
+            restart_config: 
+              condition: "on-failure"
+              max_attempts: 10
+              delay: "1m"
+            mounts:
+              - type: "bind"
+                source: "{{ jenkins_home_path }}"
+                target: "/var/jenkins_home"
+              - type: "bind"
+                source: "{{ jenkins_jcac_config_path }}"
+                target: /var/config/
+              - type: "bind"
+                source: "/var/run/docker.sock"
+                target: "/var/run/docker.sock"
+              - type: "bind"
+                source: "/root"
+                target: "/root"
+            env:              
+              - CASC_JENKINS_CONFIG=/var/config/
+              - MDEV_BB_ACCESS_TOKEN={{ vault_mdev_bitbucket_password }}
+              - MDEV_NEXUS_ACCESS_TOKEN={{ vault_mdev_nexus_password }}
+              - MDEV_SONARQUBE_TOKEN={{ vault_mdev_sonarqube_token }}
+              - GITHUB_ACCESS_TOKEN={{ github_access_token }}
+        
+        - name: Wait for Jenkins to start
+          uri:
+            url: "http://{{ ansible_default_ipv4.address | default(ansible_eth1.ipv4.address) }}:{{ jenkins_exposed_port }}/login"
+            return_content: true
+          register: response
+          until: "'Welcome to Jenkins!' in response.content"
+          retries: 18
+          delay: 10
+      tags:
+        - swarm
+    
+    - block:
+        - name: check if downloaded artifact available or not
+          stat:
+            path: "{{ jenkins_tools_download_path }}/{{ item }}"
+          with_items:
+            - apache-maven-3.6.2-bin.tar.gz
+            - jdk1.8.0_131-linux-x64.tar.gz
+          register: st
+        - debug:
+            msg: "{{st}}"
+        - name: Download tool
+          get_url:
+            url: "{{ item }}"
+            dest: "{{ jenkins_tools_download_path }}"
+            username: "{{ vault_username }}"
+            password: "{{ vault_password }}"
+          with_items:
+            - https://downloadurl.net/apache-maven-3.6.2-bin.tar.gz
+            - https://downloadurl.net/jdk1.8.0_131-linux-x64.tar.gz
+          when: 
+            - not st.results[0].stat.exists
+            - not st.results[1].stat.exists
+        - name: Maven Binaries
+          unarchive:
+            src: "{{ jenkins_tools_download_path }}/{{ item }}"
+            dest: "{{ jenkins_tools_path }}"
+            remote_src: yes            
+          with_items:
+            - apache-maven-3.6.2-bin.tar.gz
+            - jdk1.8.0_131-linux-x64.tar.gz
+        - name: Maven Settings.xml
+          template:
+            src: "{{ playbook_dir }}/util/mdev_settings.xml.j2"
+            dest: "{{ jenkins_tools_path }}/settings.xml"
+            newline_sequence: '\r\n'
+      tags:
+        - tooling
+
+    # - block:
+    #   - name: Slave Path
+    #   - name: Download require file
+    #   - name: Get Credential
+    #   - name: Create systemd Service
+    #   - name: 
+    #   tags:
+    #     - slave
