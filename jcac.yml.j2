@@ -1,0 +1,154 @@
+---
+jenkins:
+  agentProtocols:
+  - "JNLP4-connect"
+  - "Ping"
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: true
+  disableRememberMe: false
+  markupFormatter: "plainText"
+  mode: NORMAL
+  myViewsTabBar: "standard"
+  numExecutors: 3
+  nodes:
+  - permanent:
+      labelString: "slave00"
+      launcher:
+        jnlp:
+          workDirSettings:
+            disabled: false
+            failIfWorkDirIsMissing: false
+            internalDir: "remoting"
+      name: "slave00"
+      nodeDescription: "slave00"
+      numExecutors: 3
+      remoteFS: "{{ jenkins_slave00_path }}"
+      retentionStrategy: "always"
+  securityRealm:
+    local:
+      allowsSignup: false
+      enableCaptcha: false
+      users:
+      - id: "admin"
+        password: "{{ vault_jenkins_admin_password }}"
+      - id: "other"
+        password: "{{ vault_jenkins_other_password }}"
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+        - name: "admin"
+          pattern: ".*"
+          permissions:
+          - "Job/Move"
+          - "Job/Build"
+          - "Lockable Resources/View"
+          - "Credentials/Delete"
+          - "Credentials/ManageDomains"
+          - "Lockable Resources/Unlock"
+          - "View/Create"
+          - "Agent/Configure"
+          - "Job/Read"
+          - "Credentials/Update"
+          - "Agent/Create"
+          - "Job/Delete"
+          - "Agent/Build"
+          - "View/Configure"
+          - "Lockable Resources/Reserve"
+          - "Agent/Provision"
+          - "SCM/Tag"
+          - "Job/Create"
+          - "Job/Discover"
+          - "Credentials/View"
+          - "Agent/Connect"
+          - "Agent/Delete"
+          - "Run/Replay"
+          - "Agent/Disconnect"
+          - "Run/Delete"
+          - "Job/Cancel"
+          - "Overall/Read"
+          - "Run/Update"
+          - "Credentials/Create"
+          - "Overall/Administer"
+          - "View/Delete"
+          - "Job/Configure"
+          - "Job/Workspace"
+          - "View/Read"
+          assignments:
+          - "root"
+          - "admin"
+        - name: "user"
+          pattern: ".*"
+          permissions:
+          - "Lockable Resources/View"
+          - "Job/Build"
+          - "SCM/Tag"
+          - "Lockable Resources/Unlock"
+          - "Job/Discover"
+          - "Job/Read"
+          - "Run/Replay"
+          - "Run/Delete"
+          - "Job/Cancel"
+          - "Overall/Read"
+          - "Run/Update"
+          - "Job/Workspace"
+          - "View/Read"
+          - "Lockable Resources/Reserve"
+          assignments:
+          - "other"
+security:
+  apiToken:
+    creationOfLegacyTokenEnabled: false
+    tokenGenerationOnCreationEnabled: false
+    usageStatisticsEnabled: true
+credentials:
+  system:
+    domainCredentials:
+    - credentials:
+      - usernamePassword:
+          id: "mdev_bb_token"
+          password: ${MDEV_BB_ACCESS_TOKEN}
+          scope: GLOBAL
+          username: ${BB_USERNAME:-rest_user}
+      - usernamePassword:
+          id: "mdev_nexus_token"
+          password: ${MDEV_NEXUS_ACCESS_TOKEN}
+          scope: GLOBAL
+          username: ${NEXUS_USERNAME:-nexuswriter}
+      - string:
+          id: "mdev_sonarqube_token"
+          scope: GLOBAL
+          secret: ${MDEV_SONARQUBE_TOKEN}
+      - usernamePassword:
+          id: "github_token"
+          password: ${GITHUB_ACCESS_TOKEN}
+          scope: GLOBAL
+          username: ${GITHUB_USERNAME:-samitkumarpatel@gmail.com}
+tool:
+  git:
+    installations:
+    - home: "git"
+      name: "Default"
+  maven:
+    installations:
+    - home: "/var/jenkins_home/tools/apache-maven-3.6.2"
+      name: "maven_3_6_2"
+  jdk:
+    installations:
+    - home: "/var/jenkins_home/tools/jdk1.8.0_131"
+      name: "jdk1.8.0_131"
+unclassified:
+  globalLibraries:
+    libraries:
+    - name: "jenkins-shared-libs"
+      defaultVersion: "master"
+      implicit: false
+      retriever:
+        modernSCM:
+          scm:
+            git:
+              remote: "https://github.com/samitkumarpatel/jenkins-shared-libs.git"
+              credentialsId: "github_token"
+              traits:
+              - "gitHubBranchDiscovery"
