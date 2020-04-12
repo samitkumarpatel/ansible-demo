@@ -29,6 +29,7 @@
           - virtualenv
           - python3-setuptools
           - docker-compose
+          - openjdk-8-jdk
       - name: Add Docker GPG apt Key
         apt_key:
           url: https://download.docker.com/linux/ubuntu/gpg
@@ -76,6 +77,7 @@
             - python-pip
             - docker-compose
             - net-tools
+            - openjdk-8-jdk
         - name: Add Docker repo
           get_url:
             url: https://download.docker.com/linux/centos/docker-ce.repo
